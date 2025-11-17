@@ -1,0 +1,277 @@
+import React, { useState } from "react";
+import { base44 } from "@/api/base44Client";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
+import { Badge } from "@/components/ui/badge";
+import { Star, Edit2, Save, X, MessageSquare, Award, TrendingUp } from "lucide-react";
+import { toast } from "sonner";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+
+import ReviewCard from "../components/profile/ReviewCard.jsx";
+import AddReviewDialog from "../components/profile/AddReviewDialog.jsx";
+
+export default function Perfil() {
+  const queryClient = useQueryClient();
+  const [user, setUser] = useState(null);
+  const [isEditing, setIsEditing] = useState(false);
+  const [activeTab, setActiveTab] = useState('sobre');
+  const [showAddReview, setShowAddReview] = useState(false);
+  
+  const [editData, setEditData] = useState({
+    full_name: '',
+    bio: '',
+    favorite_sports: [],
+  });
+
+  React.useEffect(() => {
+    base44.auth.me().then((userData) => {
+      setUser(userData);
+      setEditData({
+        full_name: userData.full_name || '',
+        bio: userData.bio || '',
+        favorite_sports: userData.favorite_sports || [],
+      });
+    }).catch(() => {});
+  }, []);
+
+  const { data: myReviews = [] } = useQuery({
+    queryKey: ['my-reviews'],
+    queryFn: async () => {
+      const user = await base44.auth.me();
+      return base44.entities.Review.filter({ reviewed_user_email: user.email }, '-created_date');
+    },
+    initialData: [],
+  });
+
+  const updateProfileMutation = useMutation({
+    mutationFn: async (data) => {
+      await base44.auth.updateMe(data);
+      return data;
+    },
+    onSuccess: () => {
+      toast.success('Perfil atualizado com sucesso!');
+      base44.auth.me().then(setUser);
+      setIsEditing(false);
+    },
+  });
+
+  const handleSave = () => {
+    updateProfileMutation.mutate(editData);
+  };
+
+  const averageRating = myReviews.length > 0
+    ? (myReviews.reduce((sum, r) => sum + r.rating, 0) / myReviews.length).toFixed(1)
+    : 0;
+
+  const stats = [
+    { label: 'Avaliações', value: myReviews.length, icon: MessageSquare },
+    { label: 'Avaliação Média', value: `${averageRating}⭐`, icon: Star },
+    { label: 'Check-ins', value: user?.total_check_ins || 0, icon: TrendingUp },
+  ];
+
+  return (
+    <div className="p-6 md:p-10 space-y-8">
+      <div className="max-w-5xl mx-auto">
+        {/* Header */}
+        <div className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-purple-600 via-purple-500 to-pink-500 p-8 text-white shadow-2xl mb-8">
+          <div className="absolute top-0 right-0 w-96 h-96 bg-white/10 rounded-full blur-3xl -mr-48 -mt-48" />
+          <div className="absolute bottom-0 left-0 w-96 h-96 bg-pink-400/20 rounded-full blur-3xl -ml-48 -mb-48" />
+          
+          <div className="relative z-10 flex flex-col md:flex-row items-center gap-6">
+            <div className="w-32 h-32 rounded-full bg-gradient-to-br from-white/30 to-white/10 backdrop-blur-sm flex items-center justify-center border-4 border-white/50">
+              {user?.avatar_url ? (
+                <img src={user.avatar_url} alt={user.full_name} className="w-full h-full rounded-full object-cover" />
+              ) : (
+                <span className="text-6xl font-bold">
+                  {user?.full_name?.[0]?.toUpperCase() || 'U'}
+                </span>
+              )}
+            </div>
+            
+            <div className="flex-1 text-center md:text-left">
+              <h1 className="text-4xl font-bold mb-2">{user?.full_name || 'Usuário'}</h1>
+              <p className="text-purple-100 mb-4">{user?.email}</p>
+              <div className="flex flex-wrap gap-2 justify-center md:justify-start">
+                {user?.subscription_status === 'active' && (
+                  <Badge className="bg-white/20 text-white border-white/30">
+                    <Award className="w-3 h-3 mr-1" />
+                    {user.subscription_plan_name}
+                  </Badge>
+                )}
+                <Badge className="bg-white/20 text-white border-white/30">
+                  <Star className="w-3 h-3 mr-1 fill-white" />
+                  {averageRating} estrelas
+                </Badge>
+              </div>
+            </div>
+
+            {!isEditing && (
+              <Button
+                variant="outline"
+                className="bg-white/20 border-white/30 text-white hover:bg-white/30"
+                onClick={() => setIsEditing(true)}
+              >
+                <Edit2 className="w-4 h-4 mr-2" />
+                Editar Perfil
+              </Button>
+            )}
+          </div>
+        </div>
+
+        {/* Stats */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+          {stats.map((stat, index) => (
+            <Card key={index} className="border-none shadow-lg bg-white/80 backdrop-blur-sm">
+              <CardContent className="p-6 flex items-center gap-4">
+                <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center">
+                  <stat.icon className="w-6 h-6 text-white" />
+                </div>
+                <div>
+                  <p className="text-sm text-slate-600 font-medium">{stat.label}</p>
+                  <p className="text-2xl font-bold text-slate-800">{stat.value}</p>
+                </div>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+
+        {/* Content */}
+        <Card className="border-none shadow-lg bg-white/80 backdrop-blur-sm">
+          <CardHeader className="border-b border-slate-100">
+            <div className="flex items-center justify-between">
+              <Tabs value={activeTab} onValueChange={setActiveTab}>
+                <TabsList>
+                  <TabsTrigger value="sobre">Sobre</TabsTrigger>
+                  <TabsTrigger value="avaliacoes">
+                    Avaliações ({myReviews.length})
+                  </TabsTrigger>
+                </TabsList>
+              </Tabs>
+              
+              {activeTab === 'avaliacoes' && (
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => setShowAddReview(true)}
+                >
+                  Avaliar Alguém
+                </Button>
+              )}
+            </div>
+          </CardHeader>
+
+          <CardContent className="p-6">
+            {activeTab === 'sobre' && (
+              <div className="space-y-6">
+                {isEditing ? (
+                  <>
+                    <div>
+                      <Label htmlFor="full_name">Nome Completo</Label>
+                      <Input
+                        id="full_name"
+                        value={editData.full_name}
+                        onChange={(e) => setEditData({ ...editData, full_name: e.target.value })}
+                      />
+                    </div>
+
+                    <div>
+                      <Label htmlFor="bio">Biografia</Label>
+                      <Textarea
+                        id="bio"
+                        value={editData.bio}
+                        onChange={(e) => setEditData({ ...editData, bio: e.target.value })}
+                        placeholder="Conte um pouco sobre você..."
+                        rows={4}
+                      />
+                    </div>
+
+                    <div className="flex gap-3 pt-4">
+                      <Button
+                        variant="outline"
+                        onClick={() => {
+                          setIsEditing(false);
+                          setEditData({
+                            full_name: user?.full_name || '',
+                            bio: user?.bio || '',
+                            favorite_sports: user?.favorite_sports || [],
+                          });
+                        }}
+                        className="flex-1"
+                      >
+                        <X className="w-4 h-4 mr-2" />
+                        Cancelar
+                      </Button>
+                      <Button
+                        onClick={handleSave}
+                        disabled={updateProfileMutation.isPending}
+                        className="flex-1 bg-gradient-to-r from-purple-500 to-pink-500"
+                      >
+                        <Save className="w-4 h-4 mr-2" />
+                        {updateProfileMutation.isPending ? 'Salvando...' : 'Salvar'}
+                      </Button>
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    <div>
+                      <h3 className="font-semibold text-slate-800 mb-2">Biografia</h3>
+                      <p className="text-slate-600">
+                        {user?.bio || 'Nenhuma biografia adicionada ainda.'}
+                      </p>
+                    </div>
+
+                    {user?.favorite_sports && user.favorite_sports.length > 0 && (
+                      <div>
+                        <h3 className="font-semibold text-slate-800 mb-3">Esportes Favoritos</h3>
+                        <div className="flex flex-wrap gap-2">
+                          {user.favorite_sports.map((sport, idx) => (
+                            <Badge key={idx} className="bg-purple-100 text-purple-700">
+                              {sport}
+                            </Badge>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </>
+                )}
+              </div>
+            )}
+
+            {activeTab === 'avaliacoes' && (
+              <div className="space-y-6">
+                {myReviews.length === 0 ? (
+                  <div className="text-center py-12">
+                    <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-gradient-to-br from-purple-100 to-pink-100 flex items-center justify-center">
+                      <Star className="w-8 h-8 text-purple-600" />
+                    </div>
+                    <h3 className="text-xl font-bold text-slate-800 mb-2">
+                      Nenhuma avaliação ainda
+                    </h3>
+                    <p className="text-slate-600">
+                      Participe de atividades para receber avaliações
+                    </p>
+                  </div>
+                ) : (
+                  <div className="space-y-4">
+                    {myReviews.map((review) => (
+                      <ReviewCard key={review.id} review={review} />
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      </div>
+
+      <AddReviewDialog
+        open={showAddReview}
+        onClose={() => setShowAddReview(false)}
+      />
+    </div>
+  );
+}

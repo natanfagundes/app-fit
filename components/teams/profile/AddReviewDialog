@@ -1,0 +1,142 @@
+import React, { useState } from "react";
+import { base44 } from "@/api/base44Client";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Button } from "@/components/ui/button";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Star } from "lucide-react";
+import { toast } from "sonner";
+
+export default function AddReviewDialog({ open, onClose }) {
+  const queryClient = useQueryClient();
+  const [rating, setRating] = useState(5);
+  const [hoveredRating, setHoveredRating] = useState(0);
+  const [selectedUser, setSelectedUser] = useState('');
+  const [comment, setComment] = useState('');
+
+  const { data: users = [] } = useQuery({
+    queryKey: ['users'],
+    queryFn: () => base44.entities.User.list(),
+    initialData: [],
+  });
+
+  const createReviewMutation = useMutation({
+    mutationFn: async (data) => {
+      const reviewer = await base44.auth.me();
+      const reviewedUser = users.find(u => u.email === selectedUser);
+      
+      await base44.entities.Review.create({
+        reviewer_email: reviewer.email,
+        reviewer_name: reviewer.full_name,
+        reviewed_user_email: selectedUser,
+        rating: data.rating,
+        comment: data.comment,
+      });
+
+      // Update average rating
+      const userReviews = await base44.entities.Review.filter({ 
+        reviewed_user_email: selectedUser 
+      });
+      const avgRating = (userReviews.reduce((sum, r) => sum + r.rating, 0) + data.rating) / (userReviews.length + 1);
+      
+      await base44.entities.User.update(reviewedUser.id, {
+        average_rating: avgRating,
+      });
+    },
+    onSuccess: () => {
+      toast.success('Avaliação enviada com sucesso!');
+      queryClient.invalidateQueries(['my-reviews']);
+      onClose();
+      setRating(5);
+      setSelectedUser('');
+      setComment('');
+    },
+  });
+
+  const handleSubmit = (e) => {
+    e.preventDefault();
+    if (!selectedUser) {
+      toast.error('Selecione um usuário para avaliar');
+      return;
+    }
+    createReviewMutation.mutate({ rating, comment });
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={onClose}>
+      <DialogContent className="max-w-md">
+        <DialogHeader>
+          <DialogTitle>Avaliar Usuário</DialogTitle>
+        </DialogHeader>
+
+        <form onSubmit={handleSubmit} className="space-y-6">
+          <div>
+            <Label htmlFor="user">Selecionar Usuário</Label>
+            <Select value={selectedUser} onValueChange={setSelectedUser}>
+              <SelectTrigger>
+                <SelectValue placeholder="Escolha um usuário" />
+              </SelectTrigger>
+              <SelectContent>
+                {users.map((user) => (
+                  <SelectItem key={user.id} value={user.email}>
+                    {user.full_name} ({user.email})
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div>
+            <Label className="mb-3 block">Avaliação</Label>
+            <div className="flex gap-2 justify-center">
+              {[1, 2, 3, 4, 5].map((star) => (
+                <button
+                  key={star}
+                  type="button"
+                  onMouseEnter={() => setHoveredRating(star)}
+                  onMouseLeave={() => setHoveredRating(0)}
+                  onClick={() => setRating(star)}
+                  className="transition-transform hover:scale-110"
+                >
+                  <Star
+                    className={`w-10 h-10 ${
+                      star <= (hoveredRating || rating)
+                        ? 'text-yellow-500 fill-yellow-500'
+                        : 'text-gray-300'
+                    }`}
+                  />
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div>
+            <Label htmlFor="comment">Comentário (opcional)</Label>
+            <Textarea
+              id="comment"
+              value={comment}
+              onChange={(e) => setComment(e.target.value)}
+              placeholder="Compartilhe sua experiência..."
+              rows={4}
+            />
+          </div>
+
+          <div className="flex gap-3 pt-4">
+            <Button type="button" variant="outline" onClick={onClose} className="flex-1">
+              Cancelar
+            </Button>
+            <Button 
+              type="submit" 
+              className="flex-1 bg-gradient-to-r from-purple-500 to-pink-500"
+              disabled={createReviewMutation.isPending}
+            >
+              {createReviewMutation.isPending ? 'Enviando...' : 'Enviar Avaliação'}
+            </Button>
+          </div>
+        </form>
+      </DialogContent>
+    </Dialog>
+  );
+}

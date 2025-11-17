@@ -1,0 +1,75 @@
+{
+  "name": "Team",
+  "type": "object",
+  "properties": {
+    "name": {
+      "type": "string",
+      "description": "Nome da equipe"
+    },
+    "sport": {
+      "type": "string",
+      "enum": [
+        "futebol",
+        "volei",
+        "basquete",
+        "futsal",
+        "beach_tennis",
+        "tenis",
+        "corrida",
+        "ciclismo",
+        "outro"
+      ],
+      "description": "Esporte da equipe"
+    },
+    "description": {
+      "type": "string",
+      "description": "Descri\u00e7\u00e3o da equipe"
+    },
+    "captain_email": {
+      "type": "string",
+      "description": "Email do capit\u00e3o"
+    },
+    "captain_name": {
+      "type": "string",
+      "description": "Nome do capit\u00e3o"
+    },
+    "members": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "email": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          }
+        }
+      },
+      "description": "Membros da equipe"
+    },
+    "max_members": {
+      "type": "number",
+      "description": "N\u00famero m\u00e1ximo de membros"
+    },
+    "level": {
+      "type": "string",
+      "enum": [
+        "iniciante",
+        "intermediario",
+        "avancado"
+      ],
+      "description": "N\u00edvel da equipe"
+    },
+    "image_url": {
+      "type": "string",
+      "description": "Logo/imagem da equipe"
+    }
+  },
+  "required": [
+    "name",
+    "sport",
+    "captain_email",
+    "max_members"
+  ]
+}

@@ -1,0 +1,55 @@
+import React from "react";
+import { Card, CardContent } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { Star } from "lucide-react";
+
+export default function ReviewCard({ review }) {
+  return (
+    <Card className="border-none bg-gradient-to-r from-purple-50 to-pink-50 border border-purple-100">
+      <CardContent className="p-6">
+        <div className="flex items-start justify-between mb-4">
+          <div className="flex items-center gap-3">
+            <div className="w-12 h-12 rounded-full bg-gradient-to-br from-purple-400 to-pink-400 flex items-center justify-center">
+              <span className="text-white font-semibold">
+                {review.reviewer_name?.[0]?.toUpperCase() || 'A'}
+              </span>
+            </div>
+            <div>
+              <p className="font-semibold text-slate-800">{review.reviewer_name}</p>
+              <p className="text-sm text-slate-600">
+                {new Date(review.created_date).toLocaleDateString('pt-BR')}
+              </p>
+            </div>
+          </div>
+          
+          <div className="flex items-center gap-1">
+            {[...Array(5)].map((_, i) => (
+              <Star
+                key={i}
+                className={`w-5 h-5 ${
+                  i < review.rating
+                    ? 'text-yellow-500 fill-yellow-500'
+                    : 'text-gray-300'
+                }`}
+              />
+            ))}
+          </div>
+        </div>
+
+        {review.comment && (
+          <p className="text-slate-700 mb-3">{review.comment}</p>
+        )}
+
+        {review.tags && review.tags.length > 0 && (
+          <div className="flex flex-wrap gap-2">
+            {review.tags.map((tag, idx) => (
+              <Badge key={idx} variant="outline" className="text-xs">
+                {tag}
+              </Badge>
+            ))}
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  );
+}

@@ -1,0 +1,83 @@
+{
+  "name": "TeamRequest",
+  "type": "object",
+  "properties": {
+    "team_id": {
+      "type": "string",
+      "description": "ID da equipe"
+    },
+    "team_name": {
+      "type": "string",
+      "description": "Nome da equipe"
+    },
+    "event_name": {
+      "type": "string",
+      "description": "Nome do evento"
+    },
+    "event_date": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Data e hora do evento"
+    },
+    "event_location": {
+      "type": "string",
+      "description": "Local do evento"
+    },
+    "positions_needed": {
+      "type": "number",
+      "description": "Quantidade de pessoas necess\u00e1rias"
+    },
+    "description": {
+      "type": "string",
+      "description": "Descri\u00e7\u00e3o do evento/vaga"
+    },
+    "skill_level": {
+      "type": "string",
+      "enum": [
+        "iniciante",
+        "intermediario",
+        "avancado",
+        "qualquer"
+      ],
+      "description": "N\u00edvel esperado"
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "aberto",
+        "preenchido",
+        "cancelado"
+      ],
+      "default": "aberto",
+      "description": "Status da solicita\u00e7\u00e3o"
+    },
+    "applicants": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "email": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "message": {
+            "type": "string"
+          },
+          "applied_at": {
+            "type": "string"
+          }
+        }
+      },
+      "description": "Candidatos \u00e0 vaga"
+    }
+  },
+  "required": [
+    "team_id",
+    "team_name",
+    "event_name",
+    "event_date",
+    "positions_needed"
+  ]
+}

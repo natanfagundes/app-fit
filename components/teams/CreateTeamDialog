@@ -1,0 +1,144 @@
+import React, { useState } from "react";
+import { base44 } from "@/api/base44Client";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { toast } from "sonner";
+
+export default function CreateTeamDialog({ open, onClose }) {
+  const queryClient = useQueryClient();
+  const [formData, setFormData] = useState({
+    name: '',
+    sport: 'futebol',
+    description: '',
+    max_members: 10,
+    level: 'intermediario',
+  });
+
+  const createTeamMutation = useMutation({
+    mutationFn: async (data) => {
+      const user = await base44.auth.me();
+      return base44.entities.Team.create({
+        ...data,
+        captain_email: user.email,
+        captain_name: user.full_name,
+        members: [],
+      });
+    },
+    onSuccess: () => {
+      toast.success('Equipe criada com sucesso!');
+      queryClient.invalidateQueries(['teams']);
+      onClose();
+      setFormData({
+        name: '',
+        sport: 'futebol',
+        description: '',
+        max_members: 10,
+        level: 'intermediario',
+      });
+    },
+  });
+
+  const handleSubmit = (e) => {
+    e.preventDefault();
+    createTeamMutation.mutate(formData);
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={onClose}>
+      <DialogContent className="max-w-md">
+        <DialogHeader>
+          <DialogTitle>Criar Nova Equipe</DialogTitle>
+        </DialogHeader>
+
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <div>
+            <Label htmlFor="name">Nome da Equipe</Label>
+            <Input
+              id="name"
+              value={formData.name}
+              onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+              placeholder="Ex: Os Craques"
+              required
+            />
+          </div>
+
+          <div>
+            <Label htmlFor="sport">Esporte</Label>
+            <Select value={formData.sport} onValueChange={(value) => setFormData({ ...formData, sport: value })}>
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="futebol">Futebol</SelectItem>
+                <SelectItem value="volei">Vôlei</SelectItem>
+                <SelectItem value="basquete">Basquete</SelectItem>
+                <SelectItem value="futsal">Futsal</SelectItem>
+                <SelectItem value="beach_tennis">Beach Tennis</SelectItem>
+                <SelectItem value="tenis">Tênis</SelectItem>
+                <SelectItem value="corrida">Corrida</SelectItem>
+                <SelectItem value="ciclismo">Ciclismo</SelectItem>
+                <SelectItem value="outro">Outro</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div>
+            <Label htmlFor="level">Nível</Label>
+            <Select value={formData.level} onValueChange={(value) => setFormData({ ...formData, level: value })}>
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="iniciante">Iniciante</SelectItem>
+                <SelectItem value="intermediario">Intermediário</SelectItem>
+                <SelectItem value="avancado">Avançado</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div>
+            <Label htmlFor="max_members">Número Máximo de Membros</Label>
+            <Input
+              id="max_members"
+              type="number"
+              min="2"
+              max="50"
+              value={formData.max_members}
+              onChange={(e) => setFormData({ ...formData, max_members: parseInt(e.target.value) })}
+              required
+            />
+          </div>
+
+          <div>
+            <Label htmlFor="description">Descrição</Label>
+            <Textarea
+              id="description"
+              value={formData.description}
+              onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+              placeholder="Conte sobre sua equipe..."
+              rows={3}
+            />
+          </div>
+
+          <div className="flex gap-3 pt-4">
+            <Button type="button" variant="outline" onClick={onClose} className="flex-1">
+              Cancelar
+            </Button>
+            <Button 
+              type="submit" 
+              className="flex-1 bg-gradient-to-r from-purple-500 to-pink-500"
+              disabled={createTeamMutation.isPending}
+            >
+              {createTeamMutation.isPending ? 'Criando...' : 'Criar Equipe'}
+            </Button>
+          </div>
+        </form>
+      </DialogContent>
+    </Dialog>
+  );
+}

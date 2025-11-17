@@ -1,0 +1,235 @@
+import React, { useState } from "react";
+import { base44 } from "@/api/base44Client";
+import { useQuery } from "@tanstack/react-query";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Badge } from "@/components/ui/badge";
+import { Calendar, MapPin, Clock, TrendingUp, Award, Target } from "lucide-react";
+import { Skeleton } from "@/components/ui/skeleton";
+
+export default function Atividades() {
+  const [activeTab, setActiveTab] = useState('historico');
+
+  const { data: checkIns = [], isLoading } = useQuery({
+    queryKey: ['my-checkins'],
+    queryFn: async () => {
+      const user = await base44.auth.me();
+      return base44.entities.CheckIn.filter({ user_email: user.email }, '-created_date');
+    },
+    initialData: [],
+  });
+
+  const currentMonth = new Date().getMonth();
+  const currentYear = new Date().getFullYear();
+
+  const thisMonthCheckIns = checkIns.filter(c => {
+    const date = new Date(c.created_date);
+    return date.getMonth() === currentMonth && date.getFullYear() === currentYear;
+  });
+
+  const totalDuration = checkIns.reduce((sum, c) => sum + (c.duration_minutes || 0), 0);
+  const uniqueVenues = new Set(checkIns.map(c => c.venue_id)).size;
+
+  const stats = [
+    {
+      label: 'Check-ins Este Mês',
+      value: thisMonthCheckIns.length,
+      icon: Calendar,
+      color: 'from-purple-500 to-purple-600',
+    },
+    {
+      label: 'Total de Atividades',
+      value: checkIns.length,
+      icon: TrendingUp,
+      color: 'from-pink-500 to-pink-600',
+    },
+    {
+      label: 'Espaços Diferentes',
+      value: uniqueVenues,
+      icon: MapPin,
+      color: 'from-green-500 to-green-600',
+    },
+    {
+      label: 'Minutos Totais',
+      value: totalDuration,
+      icon: Clock,
+      color: 'from-orange-500 to-orange-600',
+    },
+  ];
+
+  const groupByMonth = () => {
+    const grouped = {};
+    checkIns.forEach(checkIn => {
+      const date = new Date(checkIn.created_date);
+      const key = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
+      if (!grouped[key]) {
+        grouped[key] = [];
+      }
+      grouped[key].push(checkIn);
+    });
+    return grouped;
+  };
+
+  const groupedCheckIns = groupByMonth();
+
+  return (
+    <div className="p-6 md:p-10 space-y-8">
+      <div>
+        <h1 className="text-3xl md:text-4xl font-bold text-slate-800 mb-2">
+          Minhas Atividades
+        </h1>
+        <p className="text-slate-600">Acompanhe seu progresso e histórico de treinos</p>
+      </div>
+
+      {/* Stats Grid */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-6">
+        {stats.map((stat, index) => (
+          <Card key={index} className="border-none shadow-lg bg-white/80 backdrop-blur-sm">
+            <CardContent className="p-6">
+              <div className={`w-12 h-12 rounded-xl bg-gradient-to-br ${stat.color} flex items-center justify-center mb-4`}>
+                <stat.icon className="w-6 h-6 text-white" />
+              </div>
+              <p className="text-sm text-slate-600 font-medium">{stat.label}</p>
+              <p className="text-3xl font-bold text-slate-800 mt-1">{stat.value}</p>
+            </CardContent>
+          </Card>
+        ))}
+      </div>
+
+      {/* Histórico */}
+      <Card className="border-none shadow-lg bg-white/80 backdrop-blur-sm">
+        <CardHeader className="border-b border-slate-100">
+          <div className="flex items-center justify-between">
+            <CardTitle className="flex items-center gap-2">
+              <Award className="w-5 h-5 text-purple-600" />
+              Histórico Completo
+            </CardTitle>
+            <Tabs value={activeTab} onValueChange={setActiveTab}>
+              <TabsList>
+                <TabsTrigger value="historico">Histórico</TabsTrigger>
+                <TabsTrigger value="metas">Metas</TabsTrigger>
+              </TabsList>
+            </Tabs>
+          </div>
+        </CardHeader>
+        <CardContent className="p-6">
+          {activeTab === 'historico' && (
+            <div className="space-y-8">
+              {isLoading ? (
+                <div className="space-y-4">
+                  {[1, 2, 3].map(i => (
+                    <Skeleton key={i} className="h-20 w-full" />
+                  ))}
+                </div>
+              ) : Object.keys(groupedCheckIns).length === 0 ? (
+                <div className="text-center py-12">
+                  <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-gradient-to-br from-purple-100 to-pink-100 flex items-center justify-center">
+                    <Calendar className="w-8 h-8 text-purple-600" />
+                  </div>
+                  <p className="text-slate-500 text-lg">Nenhuma atividade ainda</p>
+                  <p className="text-slate-400 text-sm mt-2">Faça seu primeiro check-in para começar!</p>
+                </div>
+              ) : (
+                Object.keys(groupedCheckIns).sort().reverse().map(monthKey => {
+                  const [year, month] = monthKey.split('-');
+                  const monthName = new Date(year, month - 1).toLocaleDateString('pt-BR', { 
+                    month: 'long', 
+                    year: 'numeric' 
+                  });
+
+                  return (
+                    <div key={monthKey}>
+                      <h3 className="text-lg font-bold text-slate-700 mb-4 capitalize">
+                        {monthName}
+                      </h3>
+                      <div className="space-y-3">
+                        {groupedCheckIns[monthKey].map((checkIn) => (
+                          <div
+                            key={checkIn.id}
+                            className="flex items-center gap-4 p-4 rounded-xl bg-gradient-to-r from-purple-50 to-pink-50 border border-purple-100 hover:shadow-md transition-shadow"
+                          >
+                            <div className="w-14 h-14 rounded-xl bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center flex-shrink-0">
+                              <MapPin className="w-7 h-7 text-white" />
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <h4 className="font-bold text-slate-800">{checkIn.venue_name}</h4>
+                              <p className="text-sm text-slate-600">
+                                {checkIn.activity_type || 'Atividade física'}
+                              </p>
+                            </div>
+                            <div className="text-right flex-shrink-0">
+                              <p className="text-sm font-semibold text-slate-700">
+                                {new Date(checkIn.check_in_date || checkIn.created_date).toLocaleDateString('pt-BR')}
+                              </p>
+                              <p className="text-xs text-slate-500">
+                                {new Date(checkIn.check_in_date || checkIn.created_date).toLocaleTimeString('pt-BR', { 
+                                  hour: '2-digit', 
+                                  minute: '2-digit' 
+                                })}
+                              </p>
+                              {checkIn.duration_minutes && (
+                                <Badge className="mt-1 bg-purple-100 text-purple-700">
+                                  {checkIn.duration_minutes} min
+                                </Badge>
+                              )}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  );
+                })
+              )}
+            </div>
+          )}
+
+          {activeTab === 'metas' && (
+            <div className="space-y-6">
+              <div className="p-8 rounded-2xl bg-gradient-to-br from-purple-100 to-pink-100 border border-purple-200">
+                <div className="flex items-center gap-3 mb-4">
+                  <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center">
+                    <Target className="w-6 h-6 text-white" />
+                  </div>
+                  <div>
+                    <h3 className="font-bold text-lg text-slate-800">Meta Mensal</h3>
+                    <p className="text-sm text-slate-600">12 check-ins por mês</p>
+                  </div>
+                </div>
+                <div className="relative h-4 bg-white/50 rounded-full overflow-hidden mb-2">
+                  <div
+                    className="absolute inset-y-0 left-0 bg-gradient-to-r from-purple-500 to-pink-500 rounded-full transition-all"
+                    style={{ width: `${Math.min((thisMonthCheckIns.length / 12) * 100, 100)}%` }}
+                  />
+                </div>
+                <div className="flex justify-between text-sm">
+                  <span className="text-slate-600">{thisMonthCheckIns.length} / 12 completos</span>
+                  <span className="font-semibold text-purple-600">
+                    {Math.round((thisMonthCheckIns.length / 12) * 100)}%
+                  </span>
+                </div>
+              </div>
+
+              <div className="grid md:grid-cols-2 gap-4">
+                <div className="p-6 rounded-2xl border-2 border-dashed border-purple-200 bg-purple-50/50">
+                  <div className="text-3xl mb-2">🔥</div>
+                  <h4 className="font-bold text-slate-800 mb-1">Sequência</h4>
+                  <p className="text-2xl font-bold text-purple-600">
+                    {Math.min(thisMonthCheckIns.length, 7)} dias
+                  </p>
+                  <p className="text-sm text-slate-600 mt-1">Continue assim!</p>
+                </div>
+
+                <div className="p-6 rounded-2xl border-2 border-dashed border-pink-200 bg-pink-50/50">
+                  <div className="text-3xl mb-2">⭐</div>
+                  <h4 className="font-bold text-slate-800 mb-1">Próximo Nível</h4>
+                  <p className="text-2xl font-bold text-pink-600">Bronze</p>
+                  <p className="text-sm text-slate-600 mt-1">Mais 3 check-ins</p>
+                </div>
+              </div>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+    </div>
+  );
+}

@@ -1,0 +1,67 @@
+{
+  "name": "Venue",
+  "type": "object",
+  "properties": {
+    "name": {
+      "type": "string",
+      "description": "Nome do espa\u00e7o/academia"
+    },
+    "description": {
+      "type": "string",
+      "description": "Descri\u00e7\u00e3o do espa\u00e7o"
+    },
+    "address": {
+      "type": "string",
+      "description": "Endere\u00e7o completo"
+    },
+    "latitude": {
+      "type": "number",
+      "description": "Latitude para geolocaliza\u00e7\u00e3o"
+    },
+    "longitude": {
+      "type": "number",
+      "description": "Longitude para geolocaliza\u00e7\u00e3o"
+    },
+    "category": {
+      "type": "string",
+      "enum": [
+        "academia",
+        "yoga",
+        "crossfit",
+        "pilates",
+        "natacao",
+        "lutas",
+        "danca",
+        "funcional",
+        "esportes"
+      ],
+      "description": "Categoria do espa\u00e7o"
+    },
+    "image_url": {
+      "type": "string",
+      "description": "URL da imagem do espa\u00e7o"
+    },
+    "amenities": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "description": "Comodidades dispon\u00edveis"
+    },
+    "rating": {
+      "type": "number",
+      "description": "Avalia\u00e7\u00e3o m\u00e9dia (calculada)"
+    },
+    "opening_hours": {
+      "type": "string",
+      "description": "Hor\u00e1rio de funcionamento"
+    }
+  },
+  "required": [
+    "name",
+    "address",
+    "latitude",
+    "longitude",
+    "category"
+  ]
+}

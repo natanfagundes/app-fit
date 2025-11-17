@@ -1,0 +1,39 @@
+{
+  "name": "SubscriptionPlan",
+  "type": "object",
+  "properties": {
+    "name": {
+      "type": "string",
+      "description": "Nome do plano"
+    },
+    "description": {
+      "type": "string",
+      "description": "Descri\u00e7\u00e3o do plano"
+    },
+    "price": {
+      "type": "number",
+      "description": "Pre\u00e7o mensal em reais"
+    },
+    "features": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "description": "Lista de benef\u00edcios inclu\u00eddos"
+    },
+    "check_ins_per_month": {
+      "type": "number",
+      "description": "Quantidade de check-ins permitidos por m\u00eas"
+    },
+    "highlighted": {
+      "type": "boolean",
+      "default": false,
+      "description": "Se o plano \u00e9 destacado"
+    }
+  },
+  "required": [
+    "name",
+    "price",
+    "check_ins_per_month"
+  ]
+}

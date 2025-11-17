@@ -1,0 +1,153 @@
+import React, { useState } from "react";
+import { base44 } from "@/api/base44Client";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { toast } from "sonner";
+
+export default function CreateRequestDialog({ open, onClose, teamId, teams }) {
+  const queryClient = useQueryClient();
+  const team = teams.find(t => t.id === teamId);
+
+  const [formData, setFormData] = useState({
+    event_name: '',
+    event_date: '',
+    event_location: '',
+    positions_needed: 1,
+    skill_level: 'qualquer',
+    description: '',
+  });
+
+  const createRequestMutation = useMutation({
+    mutationFn: async (data) => {
+      return base44.entities.TeamRequest.create({
+        ...data,
+        team_id: teamId,
+        team_name: team.name,
+        status: 'aberto',
+        applicants: [],
+      });
+    },
+    onSuccess: () => {
+      toast.success('Solicitação criada com sucesso!');
+      queryClient.invalidateQueries(['team-requests']);
+      onClose();
+      setFormData({
+        event_name: '',
+        event_date: '',
+        event_location: '',
+        positions_needed: 1,
+        skill_level: 'qualquer',
+        description: '',
+      });
+    },
+  });
+
+  const handleSubmit = (e) => {
+    e.preventDefault();
+    createRequestMutation.mutate(formData);
+  };
+
+  if (!team) return null;
+
+  return (
+    <Dialog open={open} onOpenChange={onClose}>
+      <DialogContent className="max-w-md max-h-[90vh] overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle>Solicitar Jogadores - {team.name}</DialogTitle>
+        </DialogHeader>
+
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <div>
+            <Label htmlFor="event_name">Nome do Evento</Label>
+            <Input
+              id="event_name"
+              value={formData.event_name}
+              onChange={(e) => setFormData({ ...formData, event_name: e.target.value })}
+              placeholder="Ex: Pelada de Sábado"
+              required
+            />
+          </div>
+
+          <div>
+            <Label htmlFor="event_date">Data e Hora</Label>
+            <Input
+              id="event_date"
+              type="datetime-local"
+              value={formData.event_date}
+              onChange={(e) => setFormData({ ...formData, event_date: e.target.value })}
+              required
+            />
+          </div>
+
+          <div>
+            <Label htmlFor="event_location">Local</Label>
+            <Input
+              id="event_location"
+              value={formData.event_location}
+              onChange={(e) => setFormData({ ...formData, event_location: e.target.value })}
+              placeholder="Ex: Arena Esportiva"
+              required
+            />
+          </div>
+
+          <div>
+            <Label htmlFor="positions_needed">Vagas Necessárias</Label>
+            <Input
+              id="positions_needed"
+              type="number"
+              min="1"
+              max="20"
+              value={formData.positions_needed}
+              onChange={(e) => setFormData({ ...formData, positions_needed: parseInt(e.target.value) })}
+              required
+            />
+          </div>
+
+          <div>
+            <Label htmlFor="skill_level">Nível Esperado</Label>
+            <Select value={formData.skill_level} onValueChange={(value) => setFormData({ ...formData, skill_level: value })}>
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="qualquer">Qualquer</SelectItem>
+                <SelectItem value="iniciante">Iniciante</SelectItem>
+                <SelectItem value="intermediario">Intermediário</SelectItem>
+                <SelectItem value="avancado">Avançado</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div>
+            <Label htmlFor="description">Descrição</Label>
+            <Textarea
+              id="description"
+              value={formData.description}
+              onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+              placeholder="Detalhes sobre o evento..."
+              rows={3}
+            />
+          </div>
+
+          <div className="flex gap-3 pt-4">
+            <Button type="button" variant="outline" onClick={onClose} className="flex-1">
+              Cancelar
+            </Button>
+            <Button 
+              type="submit" 
+              className="flex-1 bg-gradient-to-r from-purple-500 to-pink-500"
+              disabled={createRequestMutation.isPending}
+            >
+              {createRequestMutation.isPending ? 'Criando...' : 'Criar Solicitação'}
+            </Button>
+          </div>
+        </form>
+      </DialogContent>
+    </Dialog>
+  );
+}

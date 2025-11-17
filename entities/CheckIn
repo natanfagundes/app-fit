@@ -1,0 +1,36 @@
+{
+  "name": "CheckIn",
+  "type": "object",
+  "properties": {
+    "user_email": {
+      "type": "string",
+      "description": "Email do usu\u00e1rio que fez check-in"
+    },
+    "venue_id": {
+      "type": "string",
+      "description": "ID do espa\u00e7o"
+    },
+    "venue_name": {
+      "type": "string",
+      "description": "Nome do espa\u00e7o"
+    },
+    "check_in_date": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Data e hora do check-in"
+    },
+    "activity_type": {
+      "type": "string",
+      "description": "Tipo de atividade realizada"
+    },
+    "duration_minutes": {
+      "type": "number",
+      "description": "Dura\u00e7\u00e3o em minutos"
+    }
+  },
+  "required": [
+    "user_email",
+    "venue_id",
+    "venue_name"
+  ]
+}

@@ -1,0 +1,296 @@
+import React, { useState } from "react";
+import { base44 } from "@/api/base44Client";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Users, Calendar, MapPin, Plus, UserPlus, AlertCircle } from "lucide-react";
+import { toast } from "sonner";
+
+import CreateTeamDialog from "../components/teams/CreateTeamDialog.jsx";
+import CreateRequestDialog from "../components/teams/CreateRequestDialog.jsx";
+import ApplyToRequestDialog from "../components/teams/ApplyToRequestDialog.jsx";
+
+export default function Equipes() {
+  const queryClient = useQueryClient();
+  const [activeTab, setActiveTab] = useState('solicitacoes');
+  const [showCreateTeam, setShowCreateTeam] = useState(false);
+  const [showCreateRequest, setShowCreateRequest] = useState(false);
+  const [selectedRequest, setSelectedRequest] = useState(null);
+  const [user, setUser] = useState(null);
+
+  React.useEffect(() => {
+    base44.auth.me().then(setUser).catch(() => {});
+  }, []);
+
+  const { data: teams = [] } = useQuery({
+    queryKey: ['teams'],
+    queryFn: () => base44.entities.Team.list('-created_date'),
+    initialData: [],
+  });
+
+  const { data: teamRequests = [] } = useQuery({
+    queryKey: ['team-requests'],
+    queryFn: () => base44.entities.TeamRequest.filter({ status: 'aberto' }, '-created_date'),
+    initialData: [],
+  });
+
+  const myTeams = teams.filter(t => 
+    t.captain_email === user?.email || 
+    t.members?.some(m => m.email === user?.email)
+  );
+
+  const sportColors = {
+    futebol: 'bg-green-100 text-green-700',
+    volei: 'bg-blue-100 text-blue-700',
+    basquete: 'bg-orange-100 text-orange-700',
+    futsal: 'bg-lime-100 text-lime-700',
+    beach_tennis: 'bg-yellow-100 text-yellow-700',
+    tenis: 'bg-cyan-100 text-cyan-700',
+    corrida: 'bg-purple-100 text-purple-700',
+    ciclismo: 'bg-pink-100 text-pink-700',
+    outro: 'bg-gray-100 text-gray-700',
+  };
+
+  const levelColors = {
+    iniciante: 'bg-green-100 text-green-700',
+    intermediario: 'bg-yellow-100 text-yellow-700',
+    avancado: 'bg-red-100 text-red-700',
+    qualquer: 'bg-gray-100 text-gray-700',
+  };
+
+  return (
+    <div className="p-6 md:p-10 space-y-8">
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+        <div>
+          <h1 className="text-3xl md:text-4xl font-bold text-slate-800 mb-2">Equipes</h1>
+          <p className="text-slate-600">Encontre parceiros para suas atividades</p>
+        </div>
+        <div className="flex gap-3">
+          <Button
+            onClick={() => setShowCreateTeam(true)}
+            className="bg-gradient-to-r from-purple-500 to-pink-500"
+          >
+            <Plus className="w-4 h-4 mr-2" />
+            Criar Equipe
+          </Button>
+        </div>
+      </div>
+
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+        <TabsList className="grid w-full max-w-md grid-cols-2">
+          <TabsTrigger value="solicitacoes">Solicitações</TabsTrigger>
+          <TabsTrigger value="minhas-equipes">Minhas Equipes</TabsTrigger>
+        </TabsList>
+
+        <div className="mt-8">
+          {activeTab === 'solicitacoes' && (
+            <div className="space-y-6">
+              {teamRequests.length === 0 ? (
+                <Card className="border-none shadow-lg bg-white/80 backdrop-blur-sm">
+                  <CardContent className="p-12 text-center">
+                    <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-gradient-to-br from-purple-100 to-pink-100 flex items-center justify-center">
+                      <AlertCircle className="w-8 h-8 text-purple-600" />
+                    </div>
+                    <h3 className="text-xl font-bold text-slate-800 mb-2">
+                      Nenhuma solicitação aberta
+                    </h3>
+                    <p className="text-slate-600">
+                      Crie uma equipe para começar a solicitar jogadores
+                    </p>
+                  </CardContent>
+                </Card>
+              ) : (
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                  {teamRequests.map((request) => (
+                    <Card key={request.id} className="border-none shadow-lg bg-white/80 backdrop-blur-sm hover:shadow-xl transition-all">
+                      <CardHeader className="border-b border-slate-100">
+                        <div className="flex items-start justify-between">
+                          <div className="flex-1">
+                            <CardTitle className="text-lg mb-2">{request.event_name}</CardTitle>
+                            <div className="flex flex-wrap gap-2">
+                              <Badge className={sportColors[request.team_id] || 'bg-gray-100'}>
+                                {request.team_name}
+                              </Badge>
+                              <Badge className={levelColors[request.skill_level]}>
+                                {request.skill_level}
+                              </Badge>
+                            </div>
+                          </div>
+                        </div>
+                      </CardHeader>
+                      <CardContent className="p-6 space-y-4">
+                        <p className="text-slate-600">{request.description}</p>
+
+                        <div className="space-y-2">
+                          <div className="flex items-center gap-2 text-sm text-slate-600">
+                            <Calendar className="w-4 h-4" />
+                            <span>
+                              {new Date(request.event_date).toLocaleDateString('pt-BR', {
+                                day: '2-digit',
+                                month: 'long',
+                                year: 'numeric',
+                                hour: '2-digit',
+                                minute: '2-digit',
+                              })}
+                            </span>
+                          </div>
+                          <div className="flex items-center gap-2 text-sm text-slate-600">
+                            <MapPin className="w-4 h-4" />
+                            <span>{request.event_location}</span>
+                          </div>
+                          <div className="flex items-center gap-2 text-sm text-slate-600">
+                            <UserPlus className="w-4 h-4" />
+                            <span>
+                              {request.positions_needed} {request.positions_needed === 1 ? 'vaga' : 'vagas'} disponíveis
+                            </span>
+                          </div>
+                        </div>
+
+                        {request.applicants && request.applicants.length > 0 && (
+                          <div className="pt-4 border-t border-slate-100">
+                            <p className="text-sm text-slate-600 mb-2">
+                              {request.applicants.length} {request.applicants.length === 1 ? 'candidato' : 'candidatos'}
+                            </p>
+                          </div>
+                        )}
+
+                        <Button
+                          className="w-full bg-gradient-to-r from-purple-500 to-pink-500"
+                          onClick={() => setSelectedRequest(request)}
+                        >
+                          Candidatar-se
+                        </Button>
+                      </CardContent>
+                    </Card>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+
+          {activeTab === 'minhas-equipes' && (
+            <div className="space-y-6">
+              {myTeams.length === 0 ? (
+                <Card className="border-none shadow-lg bg-white/80 backdrop-blur-sm">
+                  <CardContent className="p-12 text-center">
+                    <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-gradient-to-br from-purple-100 to-pink-100 flex items-center justify-center">
+                      <Users className="w-8 h-8 text-purple-600" />
+                    </div>
+                    <h3 className="text-xl font-bold text-slate-800 mb-2">
+                      Você ainda não tem equipes
+                    </h3>
+                    <p className="text-slate-600 mb-6">
+                      Crie sua primeira equipe para começar
+                    </p>
+                    <Button
+                      onClick={() => setShowCreateTeam(true)}
+                      className="bg-gradient-to-r from-purple-500 to-pink-500"
+                    >
+                      <Plus className="w-4 h-4 mr-2" />
+                      Criar Equipe
+                    </Button>
+                  </CardContent>
+                </Card>
+              ) : (
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                  {myTeams.map((team) => {
+                    const isCaptain = team.captain_email === user?.email;
+                    const currentMembers = (team.members?.length || 0) + 1;
+
+                    return (
+                      <Card key={team.id} className="border-none shadow-lg bg-white/80 backdrop-blur-sm">
+                        <CardHeader className="border-b border-slate-100">
+                          <div className="flex items-start justify-between">
+                            <div className="flex items-start gap-4">
+                              <div className="w-16 h-16 rounded-xl bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center">
+                                {team.image_url ? (
+                                  <img src={team.image_url} alt={team.name} className="w-full h-full object-cover rounded-xl" />
+                                ) : (
+                                  <Users className="w-8 h-8 text-white" />
+                                )}
+                              </div>
+                              <div>
+                                <CardTitle className="text-lg mb-2">{team.name}</CardTitle>
+                                <div className="flex flex-wrap gap-2">
+                                  <Badge className={sportColors[team.sport]}>
+                                    {team.sport}
+                                  </Badge>
+                                  <Badge className={levelColors[team.level]}>
+                                    {team.level}
+                                  </Badge>
+                                  {isCaptain && (
+                                    <Badge className="bg-yellow-100 text-yellow-700">
+                                      Capitão
+                                    </Badge>
+                                  )}
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+                        </CardHeader>
+                        <CardContent className="p-6 space-y-4">
+                          <p className="text-slate-600">{team.description}</p>
+
+                          <div className="flex items-center justify-between p-4 rounded-xl bg-gradient-to-r from-purple-50 to-pink-50 border border-purple-100">
+                            <div className="flex items-center gap-2">
+                              <Users className="w-5 h-5 text-purple-600" />
+                              <span className="font-semibold text-slate-800">
+                                {currentMembers} / {team.max_members} membros
+                              </span>
+                            </div>
+                            <div className="flex -space-x-2">
+                              {[team.captain_email, ...(team.members?.map(m => m.email) || [])].slice(0, 3).map((email, idx) => (
+                                <div
+                                  key={idx}
+                                  className="w-8 h-8 rounded-full bg-gradient-to-br from-purple-400 to-pink-400 border-2 border-white flex items-center justify-center"
+                                >
+                                  <span className="text-white text-xs font-semibold">
+                                    {email[0].toUpperCase()}
+                                  </span>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+
+                          {isCaptain && (
+                            <Button
+                              className="w-full bg-gradient-to-r from-purple-500 to-pink-500"
+                              onClick={() => setShowCreateRequest(team.id)}
+                            >
+                              <UserPlus className="w-4 h-4 mr-2" />
+                              Solicitar Jogadores
+                            </Button>
+                          )}
+                        </CardContent>
+                      </Card>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+      </Tabs>
+
+      <CreateTeamDialog 
+        open={showCreateTeam} 
+        onClose={() => setShowCreateTeam(false)} 
+      />
+      
+      <CreateRequestDialog 
+        open={!!showCreateRequest} 
+        onClose={() => setShowCreateRequest(false)}
+        teamId={showCreateRequest}
+        teams={teams}
+      />
+
+      <ApplyToRequestDialog
+        open={!!selectedRequest}
+        onClose={() => setSelectedRequest(null)}
+        request={selectedRequest}
+      />
+    </div>
+  );
+}

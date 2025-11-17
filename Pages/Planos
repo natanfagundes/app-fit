@@ -1,0 +1,158 @@
+import React from "react";
+import { base44 } from "@/api/base44Client";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { Card, CardContent, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Check, Sparkles, Crown, Zap } from "lucide-react";
+import { toast } from "sonner";
+
+export default function Planos() {
+  const queryClient = useQueryClient();
+  const [user, setUser] = React.useState(null);
+
+  const { data: plans = [] } = useQuery({
+    queryKey: ['subscription-plans'],
+    queryFn: () => base44.entities.SubscriptionPlan.list(),
+    initialData: [],
+  });
+
+  React.useEffect(() => {
+    base44.auth.me().then(setUser).catch(() => {});
+  }, []);
+
+  const subscribeMutation = useMutation({
+    mutationFn: async (plan) => {
+      const currentUser = await base44.auth.me();
+      await base44.auth.updateMe({
+        subscription_plan_id: plan.id,
+        subscription_plan_name: plan.name,
+        subscription_status: 'active',
+        check_ins_used_this_month: 0,
+      });
+      return plan;
+    },
+    onSuccess: (plan) => {
+      toast.success(`Plano ${plan.name} ativado com sucesso!`);
+      base44.auth.me().then(setUser);
+    },
+  });
+
+  const planIcons = [Zap, Crown, Sparkles];
+
+  return (
+    <div className="p-6 md:p-10">
+      <div className="max-w-7xl mx-auto">
+        <div className="text-center mb-12">
+          <div className="inline-flex items-center gap-2 bg-purple-100 text-purple-700 px-4 py-2 rounded-full text-sm font-semibold mb-4">
+            <Crown className="w-4 h-4" />
+            PLANOS E PREÇOS
+          </div>
+          <h1 className="text-4xl md:text-5xl font-bold text-slate-800 mb-4">
+            Escolha Seu Plano Ideal
+          </h1>
+          <p className="text-xl text-slate-600 max-w-2xl mx-auto">
+            Acesso ilimitado a centenas de academias e espaços fitness. Cancele quando quiser.
+          </p>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-8 mb-12">
+          {plans.map((plan, index) => {
+            const Icon = planIcons[index % planIcons.length];
+            const isHighlighted = plan.highlighted;
+            const isCurrentPlan = user?.subscription_plan_id === plan.id;
+
+            return (
+              <Card 
+                key={plan.id} 
+                className={`border-none shadow-xl overflow-hidden transition-all hover:scale-105 ${
+                  isHighlighted 
+                    ? 'bg-gradient-to-br from-purple-600 to-pink-600 text-white ring-4 ring-purple-300 relative' 
+                    : 'bg-white'
+                }`}
+              >
+                {isHighlighted && (
+                  <div className="absolute top-4 right-4 bg-yellow-400 text-purple-900 px-3 py-1 rounded-full text-xs font-bold">
+                    POPULAR
+                  </div>
+                )}
+                
+                <CardHeader className="text-center p-8">
+                  <div className={`w-16 h-16 mx-auto mb-4 rounded-2xl flex items-center justify-center ${
+                    isHighlighted 
+                      ? 'bg-white/20 backdrop-blur-sm' 
+                      : 'bg-gradient-to-br from-purple-500 to-pink-500'
+                  }`}>
+                    <Icon className={`w-8 h-8 ${isHighlighted ? 'text-white' : 'text-white'}`} />
+                  </div>
+                  <CardTitle className={`text-2xl font-bold mb-2 ${isHighlighted ? 'text-white' : 'text-slate-800'}`}>
+                    {plan.name}
+                  </CardTitle>
+                  <p className={`text-sm ${isHighlighted ? 'text-purple-100' : 'text-slate-600'}`}>
+                    {plan.description}
+                  </p>
+                </CardHeader>
+
+                <CardContent className="px-8 pb-8">
+                  <div className="text-center mb-6">
+                    <div className="flex items-baseline justify-center gap-1">
+                      <span className={`text-5xl font-bold ${isHighlighted ? 'text-white' : 'text-slate-800'}`}>
+                        R$ {plan.price}
+                      </span>
+                      <span className={`text-lg ${isHighlighted ? 'text-purple-100' : 'text-slate-600'}`}>
+                        /mês
+                      </span>
+                    </div>
+                    <p className={`text-sm mt-2 ${isHighlighted ? 'text-purple-100' : 'text-slate-600'}`}>
+                      {plan.check_ins_per_month} check-ins por mês
+                    </p>
+                  </div>
+
+                  <div className="space-y-3">
+                    {plan.features?.map((feature, idx) => (
+                      <div key={idx} className="flex items-start gap-3">
+                        <div className={`p-1 rounded-full ${
+                          isHighlighted ? 'bg-white/20' : 'bg-green-100'
+                        }`}>
+                          <Check className={`w-4 h-4 ${isHighlighted ? 'text-white' : 'text-green-600'}`} />
+                        </div>
+                        <span className={`text-sm ${isHighlighted ? 'text-purple-100' : 'text-slate-700'}`}>
+                          {feature}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                </CardContent>
+
+                <CardFooter className="px-8 pb-8">
+                  <Button
+                    className={`w-full py-6 text-lg font-semibold ${
+                      isHighlighted
+                        ? 'bg-white text-purple-600 hover:bg-purple-50'
+                        : 'bg-gradient-to-r from-purple-500 to-pink-500 text-white hover:from-purple-600 hover:to-pink-600'
+                    }`}
+                    onClick={() => subscribeMutation.mutate(plan)}
+                    disabled={subscribeMutation.isPending || isCurrentPlan}
+                  >
+                    {isCurrentPlan ? 'Plano Atual' : subscribeMutation.isPending ? 'Processando...' : 'Assinar Agora'}
+                  </Button>
+                </CardFooter>
+              </Card>
+            );
+          })}
+        </div>
+
+        <div className="bg-gradient-to-r from-purple-100 to-pink-100 rounded-3xl p-8 md:p-12 text-center border border-purple-200">
+          <h2 className="text-2xl md:text-3xl font-bold text-slate-800 mb-4">
+            Ainda tem dúvidas?
+          </h2>
+          <p className="text-slate-600 mb-6 max-w-2xl mx-auto">
+            Teste qualquer plano por 7 dias grátis. Sem compromisso, cancele quando quiser.
+          </p>
+          <Button size="lg" variant="outline" className="border-purple-300 hover:bg-white">
+            Falar com Suporte
+          </Button>
+        </div>
+      </div>
+    </div>
+  );
+}

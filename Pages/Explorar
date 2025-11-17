@@ -1,0 +1,296 @@
+import React, { useState, useEffect } from "react";
+import { base44 } from "@/api/base44Client";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { MapContainer, TileLayer, Marker, Popup } from 'react-leaflet';
+import 'leaflet/dist/leaflet.css';
+import { Card, CardContent } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Badge } from "@/components/ui/badge";
+import { MapPin, Star, Search, Navigation, CheckCircle2 } from "lucide-react";
+import { toast } from "sonner";
+import L from 'leaflet';
+
+// Fix for default marker icon in react-leaflet
+delete L.Icon.Default.prototype._getIconUrl;
+L.Icon.Default.mergeOptions({
+  iconRetinaUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-icon-2x.png',
+  iconUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-icon.png',
+  shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-shadow.png',
+});
+
+export default function Explorar() {
+  const queryClient = useQueryClient();
+  const [searchTerm, setSearchTerm] = useState('');
+  const [selectedVenue, setSelectedVenue] = useState(null);
+  const [userLocation, setUserLocation] = useState(null);
+  const [mapCenter, setMapCenter] = useState([-23.5505, -46.6333]); // São Paulo default
+
+  const { data: venues = [] } = useQuery({
+    queryKey: ['venues'],
+    queryFn: () => base44.entities.Venue.list('-rating'),
+    initialData: [],
+  });
+
+  useEffect(() => {
+    if (navigator.geolocation) {
+      navigator.geolocation.getCurrentPosition(
+        (position) => {
+          const location = [position.coords.latitude, position.coords.longitude];
+          setUserLocation(location);
+          setMapCenter(location);
+        },
+        () => {
+          toast.error('Não foi possível obter sua localização');
+        }
+      );
+    }
+  }, []);
+
+  const checkInMutation = useMutation({
+    mutationFn: async (venue) => {
+      const user = await base44.auth.me();
+      
+      if (!user.subscription_plan_id || user.subscription_status !== 'active') {
+        throw new Error('Você precisa ter um plano ativo para fazer check-in');
+      }
+
+      const checkInsThisMonth = await base44.entities.CheckIn.filter({
+        user_email: user.email
+      });
+      
+      const currentMonth = new Date().getMonth();
+      const checkInsInCurrentMonth = checkInsThisMonth.filter(c => {
+        return new Date(c.created_date).getMonth() === currentMonth;
+      });
+
+      await base44.entities.CheckIn.create({
+        user_email: user.email,
+        venue_id: venue.id,
+        venue_name: venue.name,
+        check_in_date: new Date().toISOString(),
+      });
+
+      await base44.auth.updateMe({
+        check_ins_used_this_month: checkInsInCurrentMonth.length + 1,
+        total_check_ins: (user.total_check_ins || 0) + 1,
+      });
+    },
+    onSuccess: () => {
+      toast.success('Check-in realizado com sucesso!');
+      queryClient.invalidateQueries(['recent-checkins']);
+      setSelectedVenue(null);
+    },
+    onError: (error) => {
+      toast.error(error.message);
+    },
+  });
+
+  const filteredVenues = venues.filter(venue =>
+    venue.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    venue.address.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    venue.category?.toLowerCase().includes(searchTerm.toLowerCase())
+  );
+
+  const categoryColors = {
+    academia: 'bg-purple-100 text-purple-700',
+    yoga: 'bg-pink-100 text-pink-700',
+    crossfit: 'bg-orange-100 text-orange-700',
+    pilates: 'bg-green-100 text-green-700',
+    natacao: 'bg-blue-100 text-blue-700',
+    lutas: 'bg-red-100 text-red-700',
+    danca: 'bg-fuchsia-100 text-fuchsia-700',
+    funcional: 'bg-teal-100 text-teal-700',
+    esportes: 'bg-indigo-100 text-indigo-700',
+  };
+
+  return (
+    <div className="h-[calc(100vh-4rem)] flex flex-col md:flex-row">
+      {/* Sidebar */}
+      <div className="w-full md:w-96 bg-white border-r border-slate-200 flex flex-col overflow-hidden">
+        <div className="p-6 border-b border-slate-200">
+          <h1 className="text-2xl font-bold text-slate-800 mb-4">Explorar Espaços</h1>
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-slate-400" />
+            <Input
+              placeholder="Buscar por nome, local ou categoria..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="pl-10"
+            />
+          </div>
+          {userLocation && (
+            <Button
+              variant="outline"
+              size="sm"
+              className="mt-3 w-full"
+              onClick={() => setMapCenter(userLocation)}
+            >
+              <Navigation className="w-4 h-4 mr-2" />
+              Voltar para minha localização
+            </Button>
+          )}
+        </div>
+
+        <div className="flex-1 overflow-y-auto p-4 space-y-3">
+          {filteredVenues.map((venue) => (
+            <Card
+              key={venue.id}
+              className={`cursor-pointer transition-all hover:shadow-lg ${
+                selectedVenue?.id === venue.id ? 'ring-2 ring-purple-500' : ''
+              }`}
+              onClick={() => {
+                setSelectedVenue(venue);
+                setMapCenter([venue.latitude, venue.longitude]);
+              }}
+            >
+              <CardContent className="p-4">
+                <div className="flex items-start gap-3">
+                  <div className="w-16 h-16 rounded-xl bg-gradient-to-br from-purple-400 to-pink-400 flex-shrink-0 overflow-hidden">
+                    {venue.image_url ? (
+                      <img src={venue.image_url} alt={venue.name} className="w-full h-full object-cover" />
+                    ) : (
+                      <div className="w-full h-full flex items-center justify-center">
+                        <MapPin className="w-8 h-8 text-white" />
+                      </div>
+                    )}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <h3 className="font-bold text-slate-800 truncate">{venue.name}</h3>
+                    <div className="flex items-center gap-2 mt-1">
+                      <Badge className={categoryColors[venue.category] || 'bg-gray-100'}>
+                        {venue.category}
+                      </Badge>
+                      <div className="flex items-center gap-1">
+                        <Star className="w-4 h-4 text-yellow-500 fill-yellow-500" />
+                        <span className="text-sm font-semibold">{venue.rating || '5.0'}</span>
+                      </div>
+                    </div>
+                    <p className="text-xs text-slate-600 mt-2 line-clamp-2">{venue.address}</p>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          ))}
+
+          {filteredVenues.length === 0 && (
+            <div className="text-center py-8 text-slate-500">
+              Nenhum espaço encontrado
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Map */}
+      <div className="flex-1 relative">
+        <MapContainer
+          center={mapCenter}
+          zoom={13}
+          style={{ height: '100%', width: '100%' }}
+          key={mapCenter.join(',')}
+        >
+          <TileLayer
+            attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
+            url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+          />
+          
+          {userLocation && (
+            <Marker position={userLocation}>
+              <Popup>Você está aqui</Popup>
+            </Marker>
+          )}
+
+          {filteredVenues.map((venue) => (
+            <Marker
+              key={venue.id}
+              position={[venue.latitude, venue.longitude]}
+              eventHandlers={{
+                click: () => {
+                  setSelectedVenue(venue);
+                },
+              }}
+            >
+              <Popup>
+                <div className="p-2">
+                  <h3 className="font-bold text-sm">{venue.name}</h3>
+                  <p className="text-xs text-slate-600">{venue.category}</p>
+                  <Button
+                    size="sm"
+                    className="mt-2 w-full bg-gradient-to-r from-purple-500 to-pink-500"
+                    onClick={() => checkInMutation.mutate(venue)}
+                    disabled={checkInMutation.isPending}
+                  >
+                    <CheckCircle2 className="w-4 h-4 mr-1" />
+                    Check-in
+                  </Button>
+                </div>
+              </Popup>
+            </Marker>
+          ))}
+        </MapContainer>
+
+        {/* Floating venue card */}
+        {selectedVenue && (
+          <div className="absolute bottom-6 left-1/2 transform -translate-x-1/2 w-[calc(100%-3rem)] max-w-md z-[1000]">
+            <Card className="shadow-2xl border-none bg-white/95 backdrop-blur-sm">
+              <CardContent className="p-6">
+                <div className="flex items-start justify-between mb-4">
+                  <div className="flex-1">
+                    <h3 className="text-xl font-bold text-slate-800">{selectedVenue.name}</h3>
+                    <div className="flex items-center gap-2 mt-2">
+                      <Badge className={categoryColors[selectedVenue.category]}>
+                        {selectedVenue.category}
+                      </Badge>
+                      <div className="flex items-center gap-1">
+                        <Star className="w-4 h-4 text-yellow-500 fill-yellow-500" />
+                        <span className="font-semibold">{selectedVenue.rating || '5.0'}</span>
+                      </div>
+                    </div>
+                  </div>
+                  <button
+                    onClick={() => setSelectedVenue(null)}
+                    className="text-slate-400 hover:text-slate-600"
+                  >
+                    ✕
+                  </button>
+                </div>
+                
+                <p className="text-sm text-slate-600 mb-4">{selectedVenue.description}</p>
+                
+                <div className="flex items-start gap-2 text-sm text-slate-600 mb-4">
+                  <MapPin className="w-4 h-4 mt-0.5 flex-shrink-0" />
+                  <span>{selectedVenue.address}</span>
+                </div>
+
+                {selectedVenue.amenities && selectedVenue.amenities.length > 0 && (
+                  <div className="flex flex-wrap gap-2 mb-4">
+                    {selectedVenue.amenities.map((amenity, idx) => (
+                      <Badge key={idx} variant="outline" className="text-xs">
+                        {amenity}
+                      </Badge>
+                    ))}
+                  </div>
+                )}
+
+                <Button
+                  className="w-full bg-gradient-to-r from-purple-500 to-pink-500 text-white font-semibold"
+                  onClick={() => checkInMutation.mutate(selectedVenue)}
+                  disabled={checkInMutation.isPending}
+                >
+                  {checkInMutation.isPending ? (
+                    'Processando...'
+                  ) : (
+                    <>
+                      <CheckCircle2 className="w-5 h-5 mr-2" />
+                      Fazer Check-in
+                    </>
+                  )}
+                </Button>
+              </CardContent>
+            </Card>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
